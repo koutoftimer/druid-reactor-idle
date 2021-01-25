@@ -1,0 +1,12 @@
+[package]
+name = "dri"
+version = "0.1.0"
+authors = ["Ruslan Kovtun <koutoftimer@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies.druid]
+# version = "0.7.0"
+git = "https://github.com/linebender/druid"
+features = ["image", "svg", "crochet"]
