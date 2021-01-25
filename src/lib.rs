@@ -6,7 +6,7 @@ use druid::{
     widget::{Flex, Svg, SvgData, Label},
 };
 
-const WIDGET_SPACING: f64 = 0.0;
+const WIDGET_SPACING: f64 = 1.0;
 const CELL_SIZE: f64 = 20.0;
 pub const TICK_EVENT: Selector<()> = Selector::new("com.dri.event.tick");
 pub const PLACE_FUEL_EVENT: Selector<(usize, usize)> = Selector::new("com.dri.event.place-fuel");
@@ -173,9 +173,11 @@ impl Widget<Grid> for GridWidget<Grid> {
 
     }
     fn paint(&mut self, ctx: &mut PaintCtx, data: &Grid, env: &Env) {
+        let start = std::time::Instant::now();
         if let Some(flex) = self.flex.as_mut() {
             flex.paint(ctx, data, env);
         }
+        println!("paint time: {:?}", std::time::Instant::now() - start);
     }
 }
 
@@ -214,7 +216,7 @@ impl<T: Data> GridCellWidget<T> {
 }
 
 impl Widget<Fuel> for GridCellWidget<Fuel> {
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Fuel, env: &Env) { 
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, _data: &mut Fuel, _env: &Env) {
         match event {
             Event::MouseDown(mouse_event) => {
                 if mouse_event.button == MouseButton::Left {
@@ -233,9 +235,6 @@ impl Widget<Fuel> for GridCellWidget<Fuel> {
             }
             _ => {}
         }
-        if let Some(svg) = self.svg.as_mut() {
-            svg.event(ctx, event, data, env);
-        }
     }
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &Fuel, env: &Env) { 
         if let LifeCycle::WidgetAdded = event {
@@ -245,14 +244,11 @@ impl Widget<Fuel> for GridCellWidget<Fuel> {
             svg.lifecycle(ctx, event, data, env);
         }
     }
-    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &Fuel, data: &Fuel, env: &Env) { 
+    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &Fuel, data: &Fuel, _env: &Env) {
         if !old_data.of.same(&data.of) {
             self.svg = Some(WidgetPod::new(Svg::new(data.of.get_svg_data())));
             ctx.children_changed();
         } 
-        else if let Some(svg) = self.svg.as_mut() {
-            svg.update(ctx, data, env);
-        }
     }
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &Fuel, env: &Env) -> Size { 
         if let Some(svg) = self.svg.as_mut() {
