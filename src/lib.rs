@@ -23,9 +23,9 @@ impl AppDelegate<AppState> for Delegate {
         _env: &Env,
     ) -> Handled {
         if cmd.is(TICK_EVENT) {
-            for row in 0..data.grid.len() {
-                for col in 0..data.grid[row].len() {
-                    let mut cell = data.grid[row][col].clone();
+            for row in 0..data.grid.height() {
+                for col in 0..data.grid.width() {
+                    let mut cell = data.grid[(row, col)].clone();
                     if cell.of != FuelType::None {
                         if cell.hp > 0 { 
                             cell.hp = std::cmp::max(cell.hp - *data.ticks as u32, 0);
@@ -34,8 +34,8 @@ impl AppDelegate<AppState> for Delegate {
                         if cell.hp == 0 {
                             cell.of = FuelType::None;
                         }
-                        if !cell.same(&data.grid[row][col]) {
-                            Arc::make_mut(&mut data.grid)[row][col] = cell;
+                        if !cell.same(&data.grid[(row, col)]) {
+                            data.grid[(row, col)] = cell;
                         }
                     }
                 }
@@ -43,10 +43,10 @@ impl AppDelegate<AppState> for Delegate {
             return Handled::Yes
         }
         if cmd.is(PLACE_FUEL_EVENT) {
-            let payload = *cmd.get(PLACE_FUEL_EVENT).expect("place event payload");
+            let index = *cmd.get(PLACE_FUEL_EVENT).expect("place event payload");
             if data.balance >= FuelType::Wood.get_price() {
                 data.balance -= FuelType::Wood.get_price();
-                Arc::make_mut(&mut data.grid)[payload.0][payload.1] = Fuel::new(
+                data.grid[index] = Fuel::new(
                     FuelType::Wood,
                     FuelType::Wood.max_hp(),
                 );
@@ -111,7 +111,61 @@ impl Default for Fuel {
     }
 }
 
-pub type Grid = Arc<Vec<Vec<Fuel>>>;
+#[derive(Clone, Data)]
+pub struct Grid {
+    inner: Arc<Vec<Fuel>>,
+    width: usize,
+    height: usize,
+}
+
+impl Grid {
+    pub fn new(width: usize, height: usize) -> Grid {
+        Grid {
+            inner: Arc::new(vec![
+                Fuel::default();
+                width * height
+            ]),
+            width,
+            height,
+        }
+    }
+    pub fn height(&self) -> usize { self.height }
+    pub fn width(&self) -> usize { self.width }
+}
+
+pub struct GridIndex {
+    pub row: usize,
+    pub col: usize,
+}
+
+impl From<(usize, usize)> for GridIndex {
+    fn from(index: (usize, usize)) -> GridIndex {
+        GridIndex {
+            row: index.0,
+            col: index.1,
+        }
+    }
+}
+
+impl<T> std::ops::Index<T> for Grid
+    where T: Into<GridIndex>
+{
+    type Output = Fuel;
+
+    fn index(&self, index: T) -> &Self::Output {
+        let index = index.into();
+        &self.inner[self.width * index.row + index.col]
+    }
+}
+
+impl<T> std::ops::IndexMut<T> for Grid
+    where T: Into<GridIndex>
+{
+    fn index_mut(&mut self, index: T) -> &mut Self::Output {
+        let index = index.into();
+        &mut Arc::make_mut(&mut self.inner)[self.width * index.row + index.col]
+    }
+}
 
 #[derive(Clone, Data, Lens)]
 pub struct AppState {
@@ -139,9 +193,9 @@ impl Widget<Grid> for GridWidget<Grid> {
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &Grid, env: &Env) {
         if let LifeCycle::WidgetAdded = event {
             let mut flex = Flex::row();
-            for row in 0..data.len() {
+            for row in 0..data.height() {
                 let mut flex_col = Flex::column();
-                for col in 0..data[row].len() {
+                for col in 0..data.width() {
                     let cell = GridCellWidget::new(row, col)
                         .lens(GridLens { row, col })
                         .fix_size(CELL_SIZE, CELL_SIZE)
@@ -186,16 +240,24 @@ pub struct GridLens {
     col: usize,
 }
 
+impl From<&GridLens> for GridIndex {
+    fn from(lens: &GridLens) -> GridIndex {
+        GridIndex {
+            row: lens.row,
+            col: lens.col,
+        }
+    }
+}
+
 impl Lens<Grid, Fuel> for GridLens {
     fn with<V, F: FnOnce(&Fuel) -> V>(&self, state: &Grid, f: F) -> V {
-        f(&state[self.row][self.col])
+        f(&state[self])
     }
-    fn with_mut<V, F: FnOnce(&mut Fuel) -> V>(&self, mut state: &mut Grid, f: F) -> V {
-        let mut fuel = state[self.row][self.col].clone();
+    fn with_mut<V, F: FnOnce(&mut Fuel) -> V>(&self, state: &mut Grid, f: F) -> V {
+        let mut fuel = state[self].clone();
         let result = f(&mut fuel);
-        if !fuel.same(&state[self.row][self.col]) {
-            let grid = Arc::make_mut(&mut state);
-            grid[self.row][self.col] = fuel;
+        if !fuel.same(&state[self]) {
+            state[self] = fuel;
         }
         result
     }

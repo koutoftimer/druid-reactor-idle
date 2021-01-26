@@ -2,7 +2,7 @@ use std::sync::{ Arc };
 
 use druid::{ AppLauncher, WindowDesc, LocalizedString };
 
-use dri::{ build_root_widget, AppState, Fuel, FuelType, Delegate };
+use dri::{ build_root_widget, AppState, Delegate, Grid };
 
 const WINDOW_TITLE: LocalizedString<AppState> = LocalizedString::new("Hello World!");
 
@@ -12,13 +12,7 @@ fn main() {
         .window_size((850.0, 700.0));
 
     let initial_state = AppState {
-        grid: Arc::new(
-            vec![
-                vec![
-                    Fuel::new(FuelType::None, 0); 
-                    20]; 
-                20]
-        ),
+        grid: Grid::new(20, 20),
         balance: 100_f64,
         ticks: Arc::new(1_f64),
     };
